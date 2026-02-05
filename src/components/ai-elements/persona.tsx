@@ -263,7 +263,7 @@ export const Persona: FC<PersonaProps> = memo(
 
     return (
       <Component rive={rive} source={source}>
-        <RiveComponent className={cn("size-16 shrink-0", className)} />
+        <RiveComponent className={cn("size-420 shrink-0", className)} />
       </Component>
     );
   }

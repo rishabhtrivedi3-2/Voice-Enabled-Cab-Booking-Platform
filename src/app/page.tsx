@@ -1,20 +1,17 @@
 'use client'
 
-
 import { Persona } from '@/components/ai-elements/persona'
 import STTPage from './stt/page'
+import STTClient from './stt/STTClient'
+import { Car } from 'lucide-react'
 
-export default function Home() {
+export default function Home () {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-linear-to-br from-blue-50 to-indigo-100">
-      <div className="text-center mb-12">
-        <h1 className="text-5xl font-bold mb-4 text-gray-900">Voice Enabled Cab Booking</h1>
-        <p className="text-xl text-gray-600">Book your ride with voice commands</p>
-          <Persona state="listening" variant="halo" />
-
+    <>
+    <div className='min-h-screen bg-[#545479] text-white-200 font-sans selection:bg-blue-500/30 overflow-x-hidden'>
+        
+          <STTClient />
       </div>
-      
-      <STTPage />
-    </main>
+    </>
   )
 }

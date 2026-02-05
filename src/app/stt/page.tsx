@@ -6,7 +6,6 @@ export default function STTPage() {
       <h1 className="text-2xl font-bold mb-4">
         🎙 Live Speech to Text
       </h1>
-      <STTClient />
     </div>
   )
 }
