@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Persona, type PersonaState } from '@/components/ai-elements/persona'
-
+import { useLocation } from '@/components/context/location-context'
 import {
   Mic,
   Square,
@@ -11,13 +11,13 @@ import {
   Navigation,
   ShieldCheck
 } from 'lucide-react'
+import { count } from 'node:console'
 
 export default function VoiceSTT () {
   const [text, setText] = useState('Book a cab from Corrigo Park. To Airport.')
   const [personaState, setPersonaState] = useState<PersonaState>('idle')
-
   const [isInitializing, setIsInitializing] = useState(false)
-
+  const location=useLocation();
   const socketRef = useRef<WebSocket | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const cachedToken = useRef<string | null>(null)
@@ -34,12 +34,13 @@ export default function VoiceSTT () {
 
     setIsInitializing(true)
 
-    setText('')
+    setText('Book a cab from Corrigo Park. To Airport.')
 
     console.log('good to go',text);
+    console.log('go',location);
     try {
 
-      // its working ,actual after comment out
+      // STT ,its working ,actual after comment out
 
         // if (!cachedToken.current) {
 
@@ -115,7 +116,14 @@ export default function VoiceSTT () {
   setPersonaState("asleep");
 
           setIsInitializing(false);
-
+      const response=await fetch('/api/correct-text',{
+          method:'POST',
+          headers:{
+              'Content-Type':'application/json'
+          },
+          body:JSON.stringify({sentence:text,userLocation:location}),
+      });
+      
 
     } catch (error) {
 
@@ -149,7 +157,7 @@ export default function VoiceSTT () {
   }
 
   return (
-    <div className='min-h-screen bg-[#70709c] text-blue-200 flex flex-col items-center justify-center'>
+    <div className='min-h-screen bg-[#34343f] text-blue-200 flex flex-col items-center justify-center'>
       <div className='relative flex flex-col items-center gap-10'>
         <Persona
           state={personaState}
