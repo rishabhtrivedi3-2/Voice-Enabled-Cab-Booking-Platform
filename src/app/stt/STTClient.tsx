@@ -14,10 +14,12 @@ import {
 import { count } from 'node:console'
 
 export default function VoiceSTT () {
-  const [text, setText] = useState('Book a cab from Corrigo Park. To Airport.')
+  const [text, setText] = useState(
+    'Book a cab from bhumdar cowk hinjewadi. To blue widge hinjewadi.'
+  )
   const [personaState, setPersonaState] = useState<PersonaState>('idle')
   const [isInitializing, setIsInitializing] = useState(false)
-  const location=useLocation();
+  const location = useLocation()
   const socketRef = useRef<WebSocket | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const cachedToken = useRef<string | null>(null)
@@ -29,115 +31,131 @@ export default function VoiceSTT () {
     }
   }, [])
 
- 
   async function startSTT () {
-
     setIsInitializing(true)
 
     setText('Book a cab from Corrigo Park. To Airport.')
 
-    console.log('good to go',text);
-    console.log('go',location);
+    console.log('good to go', text)
+    console.log('go', location)
     try {
-
       // STT ,its working ,actual after comment out
 
-        // if (!cachedToken.current) {
+      // if (!cachedToken.current) {
 
-        //   const res = await fetch("/api/deepgram/token");
+      //   const res = await fetch("/api/deepgram/token");
 
-        //   const { token } = await res.json();
+      //   const { token } = await res.json();
 
-        //   cachedToken.current = token;
+      //   cachedToken.current = token;
 
-        // }
+      // }
 
-        // const socket = new WebSocket(
+      // const socket = new WebSocket(
 
-        //   "wss://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&interim_results=true",
+      //   "wss://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&interim_results=true",
 
-        //   ["token", cachedToken.current!]
+      //   ["token", cachedToken.current!]
 
-        // );
+      // );
 
-        // socketRef.current = socket;
+      // socketRef.current = socket;
 
-        // socket.onopen = async () => {
+      // socket.onopen = async () => {
 
-        //   setPersonaState("listening");
+      //   setPersonaState("listening");
 
-        //   setIsInitializing(false);
+      //   setIsInitializing(false);
 
-        //   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      //   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-        //   const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+      //   const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
 
-        //   recorderRef.current = recorder;
+      //   recorderRef.current = recorder;
 
-        //   recorder.ondataavailable = (e) => {
+      //   recorder.ondataavailable = (e) => {
 
-        //     if (socket.readyState === WebSocket.OPEN && e.data.size > 0) {
+      //     if (socket.readyState === WebSocket.OPEN && e.data.size > 0) {
 
-        //       socket.send(e.data);
+      //       socket.send(e.data);
 
-        //     }
+      //     }
 
-        //   };
+      //   };
 
-        //   recorder.start(500);
+      //   recorder.start(500);
 
-        // };
+      // };
 
-        // socket.onmessage = (msg) => {
+      // socket.onmessage = (msg) => {
 
-        //   const data = JSON.parse(msg.data);
+      //   const data = JSON.parse(msg.data);
 
-        //   const transcript = data.channel?.alternatives?.[0]?.transcript;
+      //   const transcript = data.channel?.alternatives?.[0]?.transcript;
 
-        //   // Only append to text if the result is final to avoid duplication
+      //   // Only append to text if the result is final to avoid duplication
 
-        //   if (transcript && data.is_final) {
+      //   if (transcript && data.is_final) {
 
-        //     setText((prev) => prev + " " + transcript);
+      //     setText((prev) => prev + " " + transcript);
 
-        //   }
+      //   }
 
-        // };
+      // };
 
-        // socket.onclose = () => setPersonaState("idle");
+      // socket.onclose = () => setPersonaState("idle");
 
-        // socket.onerror = () => {
+      // socket.onerror = () => {
 
-        //   setPersonaState("asleep");
+      //   setPersonaState("asleep");
 
-        //   setIsInitializing(false);
+      //   setIsInitializing(false);
 
-        // };
-  setPersonaState("asleep");
+      // };
+      setPersonaState('asleep')
 
-          setIsInitializing(false);
-      const response=await fetch('/api/correct-text',{
-          method:'POST',
-          headers:{
-              'Content-Type':'application/json'
-          },
-          body:JSON.stringify({sentence:text,userLocation:location}),
-      });
-      
+      setIsInitializing(false)
+      const response = await fetch('/api/correct-text', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        //mock to skip gemini
+        body: JSON.stringify({
+          sentence: text,
+          userLocation: location,
 
+        })
+      })
+      const intentData=await response.json();
+      console.log('Intent Data:',intentData);
+      const {intent}=intentData.result;
+      const pickupRes = await fetch('/api/nominatim', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body:JSON.stringify({userLocation:intentData.result.pickup_location})
+      })
+      const pickupData = await pickupRes.json()
+
+      const dropoffRes = await fetch('/api/nominatim', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body:JSON.stringify({userLocation:intentData.result.drop_location})
+      })
+      const dropoffData = await dropoffRes.json()
+      // console.log('Intent:',intent,pickupData,dropoffData);
     } catch (error) {
-
       console.error('Voice Error:', error)
 
       setPersonaState('asleep')
 
       setIsInitializing(false)
-
     }
-
   }
-
-
 
   function stopSTT () {
     console.log('Stopping STT...')
@@ -185,10 +203,9 @@ export default function VoiceSTT () {
         {/* Controls */}
         <div className='flex flex-column column-gap-2 '>
           <div className='text-red-50'>
-
             <span className='border-2  italic rounded-md px-3 py-1'>
-            {personaState}
-          </span>
+              {personaState}
+            </span>
           </div>
           <button
             onClick={() =>
@@ -213,7 +230,6 @@ export default function VoiceSTT () {
               </>
             )}
           </button>
-            
         </div>
 
         {/* Safety Footer */}

@@ -84,6 +84,7 @@ ${sentence}
             success: true,
             result: parsed
         });
+        // Mock response to skip Gemini integration for now
     } catch (error: any) {
         return NextResponse.json(
             {
