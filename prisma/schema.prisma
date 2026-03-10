@@ -1,0 +1,46 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url=env("DATABASE_URL")
+}
+
+model Driver {
+  id        String   @id @default(uuid())
+  name      String
+  vehicle   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  licensePlate String 
+  rating     Float
+}
+
+model Product {
+  id         String   @id @default(uuid())
+  name       String
+  basePrice  Float
+  perKmRate  Float
+  etaMinutes Int
+  createdAt  DateTime @default(now())
+}
+
+model RideRequest {
+  id             String   @id @default(uuid())
+  productId      String
+  driverId       String
+  startLatitude  Float
+  startLongitude Float
+  endLatitude    Float
+  endLongitude   Float
+  status         String
+  price          Float
+  createdAt      DateTime @default(now())
+}

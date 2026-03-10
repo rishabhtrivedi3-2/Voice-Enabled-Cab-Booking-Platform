@@ -11,18 +11,27 @@ import {
   Navigation,
   ShieldCheck
 } from 'lucide-react'
-import { count } from 'node:console'
 
 export default function VoiceSTT () {
-  const [text, setText] = useState(
-    'Book a cab from bhumdar cowk hinjewadi. To blue widge hinjewadi.'
-  )
+  const [text, setText] = useState('book a cab from Koregaon Park to airport') // have to change for real
   const [personaState, setPersonaState] = useState<PersonaState>('idle')
   const [isInitializing, setIsInitializing] = useState(false)
   const location = useLocation()
   const socketRef = useRef<WebSocket | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const cachedToken = useRef<string | null>(null)
+  const [err, setError] = useState(null)
+  const transcriptRef = useRef<string>('')
+function convertFloat32ToInt16(buffer: Float32Array) {
+  const l = buffer.length;
+  const buf = new Int16Array(l);
+
+  for (let i = 0; i < l; i++) {
+    buf[i] = Math.max(-1, Math.min(1, buffer[i])) * 0x7fff;
+  }
+
+  return buf.buffer;
+}
 
   useEffect(() => {
     return () => {
@@ -33,129 +42,152 @@ export default function VoiceSTT () {
 
   async function startSTT () {
     setIsInitializing(true)
-
-    setText('Book a cab from Corrigo Park. To Airport.')
+    transcriptRef.current = '' // Reset transcript ref
+    setText('') // Reset text state
 
     console.log('good to go', text)
     console.log('go', location)
-    try {
-      // STT ,its working ,actual after comment out
+    //mock token
+    if (process.env.NEXT_PUBLIC_MOCK_TOKEN === 'true') {
 
-      // if (!cachedToken.current) {
+  try {
+    console.log('Mock token mode enabled. Simulating API calls...')
+             const response=await fetch('/api/ride-flow',{
+                method:'POST',
+                headers: {
+                  'Content-Type': 'application/json'  
+                },
+                body: JSON.stringify({
+                  sentence: "book a cab from Koregaon Park to airport",
+                  userLocation: location,
+                })
+              }
+              
+            )
+            setIsInitializing(false)
+          }
+            catch (error) {
+              setError(error.message || 'An error occurred during STT initialization.')
+              console.error('Voice Error:', error)
+              setPersonaState('asleep')
+              setIsInitializing(false)
+            }
+  }
+    else{
 
-      //   const res = await fetch("/api/deepgram/token");
+      try {
+        // STT ,its working ,actual after comment out
+        console.log("actual mode")
+        // transcriptRef.current = 'book a cab from Koregaon Park to airport' // Reset transcript ref
+      if (!cachedToken.current) {
+        const res = await fetch('/api/deepgram/token')
 
-      //   const { token } = await res.json();
+        const { token } = await res.json()
 
-      //   cachedToken.current = token;
+        cachedToken.current = token
+      }
+      try {
+        const socket = new WebSocket(
+          'wss://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&interim_results=true&encoding=linear16&sample_rate=16000',
 
-      // }
+          ['token', cachedToken.current!]
+        )
 
-      // const socket = new WebSocket(
+        socketRef.current = socket
 
-      //   "wss://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&interim_results=true",
+        socket.onopen = async () => {
+          setPersonaState('listening')
 
-      //   ["token", cachedToken.current!]
+          setIsInitializing(false)
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true
+          })
 
-      // );
+          const audioContext = new AudioContext({ sampleRate: 16000 })
 
-      // socketRef.current = socket;
+          const source = audioContext.createMediaStreamSource(stream)
 
-      // socket.onopen = async () => {
+          const processor = audioContext.createScriptProcessor(4096, 1, 1)
 
-      //   setPersonaState("listening");
+          source.connect(processor)
+          processor.connect(audioContext.destination)
 
-      //   setIsInitializing(false);
+          processor.onaudioprocess = e => {
+            const input = e.inputBuffer.getChannelData(0)
 
-      //   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const pcmData = convertFloat32ToInt16(input)
 
-      //   const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+            if (socket.readyState === WebSocket.OPEN) {
+              socket.send(pcmData)
+            }
+          }
+        }
 
-      //   recorderRef.current = recorder;
+        socket.onerror = err => {
+          console.error('WebSocket error:', err)
+          setPersonaState('asleep')
+          setIsInitializing(false)
+        }
 
-      //   recorder.ondataavailable = (e) => {
+        socket.onmessage = msg => {
+          const data = JSON.parse(msg.data)
 
-      //     if (socket.readyState === WebSocket.OPEN && e.data.size > 0) {
+          const transcript = data.channel?.alternatives?.[0]?.transcript
+          console.log('Received message:', transcript && data.is_final)
+          // setText("book a cab from Koregaon Park to airport")
+          // transcriptRef.current = "book a cab from Koregaon Park to airport"
+          // Only append to text if the result is final to avoid duplication
+          if (transcript && data.is_final) {
+            const newTranscript = transcriptRef.current + ' ' + transcript
+            transcriptRef.current = newTranscript
+            setText(newTranscript)
+          }
+          else if (!transcript && !data.is_final) {
+            setError('No speech detected. Please try again.')
+          }
+          console.log('Transcript:', transcript, 'Is Final:', data.is_final, 'text:', transcriptRef.current);
+        }
 
-      //       socket.send(e.data);
+        socket.onclose = async () => {
+          setPersonaState('idle')
+          
+          // Trigger POST requests after transcript is received and socket closes
+          if (location && transcriptRef.current) {
+            console.log('Final Transcript for Intent Extraction:', transcriptRef.current)
+            try{
+              const response=await fetch('/api/ride-flow',{
+                method:'POST',
+                headers: {
+                  'Content-Type': 'application/json'  
+                },
+                body: JSON.stringify({
+                  sentence: transcriptRef.current,
+                  userLocation: location,
+                })
+              }
+              
+              )}
+            catch (error) {
+              setError(error.message || 'An error occurred during STT initialization.')
+              console.error('Voice Error:', error.message)
+              
+              setPersonaState('asleep')
+              
+              setIsInitializing(false)
+            }
+          }
+        }
+      }catch(err){
+        setError(err.message || 'An error occurred during STT initialization.')
+        console.error('Voice Error:', err)
+      }
+    }catch(err){
 
-      //     }
-
-      //   };
-
-      //   recorder.start(500);
-
-      // };
-
-      // socket.onmessage = (msg) => {
-
-      //   const data = JSON.parse(msg.data);
-
-      //   const transcript = data.channel?.alternatives?.[0]?.transcript;
-
-      //   // Only append to text if the result is final to avoid duplication
-
-      //   if (transcript && data.is_final) {
-
-      //     setText((prev) => prev + " " + transcript);
-
-      //   }
-
-      // };
-
-      // socket.onclose = () => setPersonaState("idle");
-
-      // socket.onerror = () => {
-
-      //   setPersonaState("asleep");
-
-      //   setIsInitializing(false);
-
-      // };
-      setPersonaState('asleep')
-
-      setIsInitializing(false)
-      const response = await fetch('/api/correct-text', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        //mock to skip gemini
-        body: JSON.stringify({
-          sentence: text,
-          userLocation: location,
-
-        })
-      })
-      const intentData=await response.json();
-      console.log('Intent Data:',intentData);
-      const {intent}=intentData.result;
-      const pickupRes = await fetch('/api/nominatim', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body:JSON.stringify({userLocation:intentData.result.pickup_location})
-      })
-      const pickupData = await pickupRes.json()
-
-      const dropoffRes = await fetch('/api/nominatim', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body:JSON.stringify({userLocation:intentData.result.drop_location})
-      })
-      const dropoffData = await dropoffRes.json()
-      // console.log('Intent:',intent,pickupData,dropoffData);
-    } catch (error) {
-      console.error('Voice Error:', error)
-
-      setPersonaState('asleep')
-
-      setIsInitializing(false)
     }
   }
+
+    }
+    
 
   function stopSTT () {
     console.log('Stopping STT...')
@@ -177,6 +209,7 @@ export default function VoiceSTT () {
   return (
     <div className='min-h-screen bg-[#34343f] text-blue-200 flex flex-col items-center justify-center'>
       <div className='relative flex flex-col items-center gap-10'>
+        <div>{err && <p className='text-red-500 '>{err}</p>}</div>
         <Persona
           state={personaState}
           variant='halo'
@@ -212,11 +245,11 @@ export default function VoiceSTT () {
               personaState === 'listening' ? stopSTT() : startSTT()
             }
             disabled={isInitializing}
-            className={`flex items-center gap-3 px-10 py-5 rounded-[24px] font-bold text-lg transition-all active:scale-95 ${
+            className={`flex items-center gap-3 px-10 py-5 rounded-[24px] font-bold text-lg transition-all active:scale-95 border border-white/30 backdrop-blur-xl shadow-xl group/btn hover:bg-white-500 ${
               personaState === 'listening'
-                ? 'bg-red-500 hover:bg-red-600'
-                : 'bg-blue-600 hover:bg-blue-500'
-            }`}
+                ? 'bg-red-500/60 hover:bg-red-600/70'
+                : 'bg-blue-600/60 hover:bg-blue-500/70'
+            }before:absolute before:inset-0 before:bg-linear-to-br before:from-white/20 before:to-transparent before:opacity-50 before:pointer-events-none`}
           >
             {personaState === 'listening' ? (
               <>
@@ -233,7 +266,7 @@ export default function VoiceSTT () {
         </div>
 
         {/* Safety Footer */}
-        <div className='mt-6 flex items-center gap-3 text-sm text-slate-400'>
+        <div className='mt-6 flex items-center gap-3 text-sm text-slate-400px-4 py-2 bg-white/5 backdrop-blur-lg'>
           <ShieldCheck className='size-5 text-blue-400' />
           Verified rides protected by Voyage AI.
         </div>

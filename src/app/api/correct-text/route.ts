@@ -1,7 +1,22 @@
 import { NextResponse } from "next/server";
 import { count, error } from "node:console";
 import { openai } from "@/lib/utils/openai";
+const USE_MOCK = process.env.NEXT_PUBLIC_MOCK_TOKEN === 'true';
 export async function POST(req: Request) {
+    
+    if (USE_MOCK){
+        const {sentence,userLocation}= await req.json();
+        return NextResponse.json({
+            success: true,
+            result:{
+                intent: "mock",
+                sentence:sentence,
+                userLocation:userLocation ,
+                pickup_location: "Koregaon Park, Ghorpuri, Pune, Pune City, Pune, Maharashtra, 411001, India",
+                drop_location: "Shivaji Nagar, Pune, Maharashtra, India"
+            }
+        })
+    }
     try {
         const { sentence, userLocation } = await req.json();
 
@@ -10,10 +25,9 @@ export async function POST(req: Request) {
         }
         const prompt = `Task:
 Extract pickup and drop locations from the sentence.
-Correct spelling to match real-world places near the user's location.
+Correct spelling to match real-world places near the user's location for both pickup and drop locations.
 Classify intent as BOOK_RIDE, CANCEL_RIDE, or CHECK_STATUS.
-
-Return JSON only. No markdown.
+Return JSON with intent, pickup_location, and drop_location. No markdown.
 
 UserLocation:
 ${JSON.stringify(userLocation)}
@@ -29,12 +43,12 @@ ${sentence}
             ],
             generationConfig: {
                 temperature: 0,
-                responseMimeType: "application/json"
+
             }
         };
 
         const geminiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
             {
                 method: "POST",
                 headers: {
@@ -53,8 +67,7 @@ ${sentence}
                 { status: 500 }
             );
         }
-        const data = await geminiRes.json();
-
+        const data=await geminiRes.json();
         const rawText =
             data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
@@ -65,7 +78,6 @@ ${sentence}
             );
         }
 
-        // 7. Convert Gemini Output into JSON
         let parsed;
         try {
             parsed = JSON.parse(rawText);
