@@ -65,7 +65,19 @@ function convertFloat32ToInt16(buffer: Float32Array) {
               
             )
             setIsInitializing(false)
+            const data = await response.json();
+            console.log('Ride Flow Response:', data)
+            try{
+                if (data.success && data.result.tssData) {
+                  const audio = new Audio(data.result.tssData);
+                  audio.play().catch(err=>console.error('Error playing audio:', err));
+                  
+                }
+              }catch(err){
+                console.error('Error playing audio:', err)  
+            }
           }
+          
             catch (error) {
               setError(error.message || 'An error occurred during STT initialization.')
               console.error('Voice Error:', error)
@@ -164,9 +176,20 @@ function convertFloat32ToInt16(buffer: Float32Array) {
                   sentence: transcriptRef.current,
                   userLocation: location,
                 })
-              }
+              })
               
-              )}
+              const data = await response.json();
+            console.log('Ride Flow Response:', data)
+            try{
+                if (data.success && data.result.tssData) {
+                  const audio = new Audio(data.result.tssData);
+                  audio.play().catch(err=>console.error('Error playing audio:', err));
+                  
+                }
+              }catch(err){
+                console.error('Error playing audio:', err)  
+            }
+          }
             catch (error) {
               setError(error.message || 'An error occurred during STT initialization.')
               console.error('Voice Error:', error.message)
@@ -240,6 +263,7 @@ function convertFloat32ToInt16(buffer: Float32Array) {
               {personaState}
             </span>
           </div>
+          
           <button
             onClick={() =>
               personaState === 'listening' ? stopSTT() : startSTT()
